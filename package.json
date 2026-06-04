@@ -6,9 +6,11 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "three": "latest",
     "typescript": "latest",
-    "three": "latest"
+    "vite": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/three": "^0.184.1"
+  }
 }
