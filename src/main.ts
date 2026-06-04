@@ -57,7 +57,7 @@ const corridors: Rect[] = [
   { id: 'C_R02_R05', x1: -.9, x2: .9, z1: 3.2, z2: 5.1 },
   { id: 'C_R03_R05', x1: -10.5, x2: -8.9, z1: 2.5, z2: 5.1 },
   { id: 'C_R04_R05', x1: 8.9, x2: 10.5, z1: 2.5, z2: 5.1 },
-  { id: 'C_R02_R06', x1: -.95, x2: .95, z1: -5.8, z2: -3.2 },
+  { id: 'C_R02_R06', x1: -1.2, x2: 1.2, z1: -5.8, z2: -3.2 },
   { id: 'C_R06_R07', x1: -.9, x2: .9, z1: -13.6, z2: -10.8 },
 ];
 const allWalkRects = [...rooms, ...corridors];
@@ -107,7 +107,7 @@ class VisitorsGame {
       [-9,-2.65,5.8,.25],[-9,2.65,5.8,.25],[-12,0,.25,5.2],[-6,1.8,.25,1.4],[-6,-1.8,.25,1.4],
       [9,-2.65,5.8,.25],[9,2.65,5.8,.25],[12,0,.25,5.2],[6,1.8,.25,1.4],[6,-1.8,.25,1.4],
       [0,4.95,14.6,.25],[0,6.85,14.6,.25],[-7.35,5.9,.25,2.1],[7.35,5.9,.25,2.1],
-      [-3.2,-8.2,.25,5.2],[3.2,-8.2,.25,5.2],[-1.9,-5.65,2.2,.25],[1.9,-5.65,2.2,.25],[0,-10.95,6.2,.25],
+      [-3.2,-8.2,.25,5.2],[3.2,-8.2,.25,5.2],[-2.125,-5.65,1.75,.25],[2.125,-5.65,1.75,.25],[0,-10.95,6.2,.25],
       [-2.8,-15.45,.25,3.8],[2.8,-15.45,.25,3.8],[0,-17.45,5.6,.25]
     ];
     segs.forEach(s => addWall(s[0], s[1], s[2], s[3]));
@@ -169,15 +169,24 @@ class VisitorsGame {
   tick() { const dt = Math.min(this.clock.getDelta(), .033); this.update(dt); this.renderer.render(this.scene, this.camera); requestAnimationFrame(() => this.tick()); }
   update(dt: number) {
     this.player.attackTimer -= dt; this.player.yaw -= this.input.lookDX * TUNING.lookSensitivity; this.input.lookDX = 0; this.camera.rotation.set(0, this.player.yaw, 0);
-    const speed = TUNING.moveSpeed * (this.grabbed ? TUNING.dragMoveMultiplier / this.grabbed.weight : 1); const f = new THREE.Vector3(Math.sin(this.player.yaw),0,Math.cos(this.player.yaw)); const r = new THREE.Vector3(Math.cos(this.player.yaw),0,-Math.sin(this.player.yaw));
+    const speed = TUNING.moveSpeed * (this.grabbed ? TUNING.dragMoveMultiplier / this.grabbed.weight : 1); const f = this.forwardDir(); const r = this.rightDir();
     const move = f.multiplyScalar(this.input.moveY).add(r.multiplyScalar(this.input.moveX)); if (move.lengthSq() > .001) { move.normalize().multiplyScalar(speed * dt); this.tryMove(move); }
     this.camera.position.copy(this.player.pos); this.updateGrabbedCorpse(dt);
     if (this.input.attacking) this.attack(); if (this.input.drop) { this.dropCorpse(); this.input.drop = false; } if (this.input.interact) { this.interact(); this.input.interact = false; }
     this.updateEnemies(dt); this.updateHud(); this.hitPulse = Math.max(0, this.hitPulse - dt);
   }
   tryMove(delta: THREE.Vector3) { const np = this.player.pos.clone().add(delta); if (this.isWalkable(np.x, np.z)) this.player.pos.copy(np); }
-  isWalkable(x: number, z: number) { if (!this.shortcutUnlocked && z > 2.5 && z < 6.8) return false; if (!this.deepDoorUnlocked && z < -13.45) return false; return allWalkRects.some(r => x > r.x1 + TUNING.playerRadius && x < r.x2 - TUNING.playerRadius && z > r.z1 + TUNING.playerRadius && z < r.z2 - TUNING.playerRadius); }
-  updateGrabbedCorpse(dt: number) { if (!this.grabbed) return; const back = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw)).multiplyScalar(1.1); const target = this.player.pos.clone().add(back); target.y = .22; if (this.isWalkable(target.x, target.z)) this.grabbed.mesh.position.lerp(target, Math.min(1, dt * 8)); }
+  isWalkable(x: number, z: number) {
+    const samples = [
+      [0, 0], [TUNING.playerRadius, 0], [-TUNING.playerRadius, 0], [0, TUNING.playerRadius], [0, -TUNING.playerRadius],
+      [TUNING.playerRadius * .7, TUNING.playerRadius * .7], [TUNING.playerRadius * .7, -TUNING.playerRadius * .7], [-TUNING.playerRadius * .7, TUNING.playerRadius * .7], [-TUNING.playerRadius * .7, -TUNING.playerRadius * .7],
+    ];
+    return samples.every(([sx, sz]) => this.isOpenWalkPoint(x + sx, z + sz));
+  }
+  isOpenWalkPoint(x: number, z: number) { if (!this.shortcutUnlocked && z > 2.5 && z < 6.8) return false; if (!this.deepDoorUnlocked && z < -13.45) return false; return allWalkRects.some(r => x > r.x1 && x < r.x2 && z > r.z1 && z < r.z2); }
+  forwardDir() { return new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw)); }
+  rightDir() { return new THREE.Vector3(Math.cos(this.player.yaw), 0, -Math.sin(this.player.yaw)); }
+  updateGrabbedCorpse(dt: number) { if (!this.grabbed) return; const back = this.forwardDir().multiplyScalar(-1.1); const target = this.player.pos.clone().add(back); target.y = .22; if (this.isWalkable(target.x, target.z)) this.grabbed.mesh.position.lerp(target, Math.min(1, dt * 8)); }
 
   updateEnemies(dt: number) {
     let alive = 0; for (const e of this.enemies) { if (!e.alive) continue; e.spawnDelay -= dt; if (e.spawnDelay > 0) { e.mesh.visible = false; continue; } e.mesh.visible = true; alive++; e.attackTimer -= dt; e.hitFlash -= dt;
@@ -188,7 +197,7 @@ class VisitorsGame {
     }
     if (this.waveActive && alive === 0 && this.enemies.every(e => e.spawnDelay <= 0 || !e.alive)) this.completeWave(false);
   }
-  attack() { if (this.player.attackTimer > 0) return; this.player.attackTimer = TUNING.attackCooldown; let best: Enemy | undefined; let bestDist = Infinity; const forward = new THREE.Vector3(Math.sin(this.player.yaw),0,Math.cos(this.player.yaw));
+  attack() { if (this.player.attackTimer > 0) return; this.player.attackTimer = TUNING.attackCooldown; let best: Enemy | undefined; let bestDist = Infinity; const forward = this.forwardDir();
     for (const e of this.enemies.filter(e => e.alive && e.spawnDelay <= 0)) { const to = e.mesh.position.clone().sub(this.player.pos); to.y = 0; const d = to.length(); if (d < TUNING.attackRange && to.normalize().dot(forward) > .25 && d < bestDist) { best = e; bestDist = d; } }
     if (!best) return; best.hp -= this.player.damage; best.hitFlash = .12; if (best.hp <= 0) this.killEnemy(best);
   }
