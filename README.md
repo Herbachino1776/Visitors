@@ -32,3 +32,11 @@ The first playable area is called the **Test Tomb**.
 It is not the final first dungeon. It exists to prove the central game loop:
 
 **Visitor enters. Guardian kills. Guardian drags corpse. Tomb feeds. Guardian upgrades. Next visitor arrives.**
+
+## Deployment
+
+VISITORS deploys to GitHub Pages from GitHub Actions. When a pull request is merged into the default branch, the `Deploy Pages` workflow runs on that push, builds the Vite app with `npm run build`, and publishes the production `dist` folder to Pages.
+
+A deployment can also be started manually from the repository's Actions tab with the workflow's `workflow_dispatch` trigger.
+
+Repository Settings → Pages must have **Source** set to **GitHub Actions**. This repo does not rely on branch or docs-folder Pages publishing.
